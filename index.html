@@ -3,849 +3,902 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ASSY-INV C3 · Control de Inventario</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Barlow:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Assy Track — Control de Ensamble</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0b0d12;--bg2:#111318;--bg3:#181b22;--bg4:#1e2230;
-  --border:#252a38;--border2:#2e3448;
-  --accent:#d4f53c;--accent2:#3cf5b4;--red:#f5503c;--orange:#f5a03c;--blue:#3cb4f5;
-  --text:#dde1ee;--text2:#7880a0;--text3:#3e4560;
-  --font:'Barlow',sans-serif;--mono:'DM Mono',monospace;
-  --ok-bg:rgba(60,245,180,.1);--ok-bd:rgba(60,245,180,.3);--ok-tx:#3cf5b4;
-  --ns-bg:rgba(245,80,60,.1);--ns-bd:rgba(245,80,60,.3);--ns-tx:#f5503c;
-  --na-bg:rgba(62,69,96,.15);--na-bd:rgba(62,69,96,.3);--na-tx:#4a5478;
-  --weld-tx:#3cb4f5;--weld-bg:rgba(60,180,245,.1);--weld-bd:rgba(60,180,245,.3);
-  --pint-tx:#f5a03c;--pint-bg:rgba(245,160,60,.1);--pint-bd:rgba(245,160,60,.3);
+  --bg:#0f0f0f;--surface:#1a1a1a;--surface2:#222;--border:#2e2e2e;--border2:#3a3a3a;
+  --text:#e8e8e8;--text2:#888;--text3:#555;
+  --accent:#c8f542;--accent-dim:rgba(200,245,66,.12);
+  --yellow:#f5c842;--ybg:rgba(245,200,66,.15);--yborder:rgba(245,200,66,.4);
+  --green:#42f56f;--gbg:rgba(66,245,111,.15);--gborder:rgba(66,245,111,.4);
+  --red:#f54242;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+  /* Heights of each sticky band — must match actual rendered heights */
+  --h-top:52px;    /* topbar */
+  --h-stats:40px;  /* stats bar */
+  --h-legend:34px; /* legend */
+  --h-tabs:41px;   /* line tabs */
+  --h-sticky: calc(var(--h-top) + var(--h-stats) + var(--h-legend) + var(--h-tabs));
 }
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;overflow:hidden;}
-header{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;}
-.logo{font-family:var(--mono);font-size:12px;letter-spacing:.15em;color:var(--accent);}
-.logo em{color:var(--text2);font-style:normal;}
-.hright{display:flex;align-items:center;gap:8px;}
-.chip{font-family:var(--mono);font-size:10px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);padding:3px 9px;border-radius:3px;letter-spacing:.05em;}
-.chip.btn{cursor:pointer;transition:all .15s;}
-.chip.btn:hover{border-color:var(--accent2);color:var(--accent2);}
-.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text3);display:inline-block;margin-right:4px;}
-.sync-dot.ok{background:var(--ok-tx);}
-.sync-dot.err{background:var(--ns-tx);}
-.sync-dot.loading{background:var(--orange);animation:blink .8s infinite;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.app{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 52px);}
-aside{background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
-.side-scroll{flex:1;overflow-y:auto;}
-.block-hd{padding:10px 14px 8px;font-size:9px;font-weight:700;letter-spacing:.25em;color:var(--text2);border-bottom:1px solid var(--border);text-transform:uppercase;display:flex;align-items:center;gap:7px;flex-shrink:0;}
-.pip{width:5px;height:5px;border-radius:50%;}
-.pip-y{background:var(--accent);}
-.pip-g{background:var(--accent2);}
-.pip-b{background:var(--blue);}
-.pip-o{background:var(--orange);}
-.date-bar{padding:9px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;flex-shrink:0;}
-.date-input{background:var(--bg4);border:1px solid var(--border2);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;padding:4px 8px;flex:1;}
-.date-input:focus{outline:none;border-color:var(--accent);}
-.date-input::-webkit-calendar-picker-indicator{filter:invert(.4);}
-.btn-icon{padding:4px 8px;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;color:var(--text2);cursor:pointer;transition:all .15s;font-family:var(--mono);font-size:10px;white-space:nowrap;}
-.btn-icon:hover{border-color:var(--accent2);color:var(--accent2);}
-.btn-icon.danger:hover{border-color:var(--red);color:var(--red);}
-.btn-icon:disabled{opacity:.4;cursor:not-allowed;}
-.inv-mode-bar{padding:7px 12px;display:flex;gap:5px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.mode-btn{flex:1;padding:4px;border-radius:4px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .15s;}
-.mode-btn.active-weld{border-color:var(--weld-bd);color:var(--weld-tx);background:var(--weld-bg);}
-.mode-btn.active-pint{border-color:var(--pint-bd);color:var(--pint-tx);background:var(--pint-bg);}
-.mode-btn.active-both{border-color:var(--ok-bd);color:var(--ok-tx);background:var(--ok-bg);}
-/* CELL CARDS — horizontal layout: square img left, info right */
-.cells-grid{display:grid;grid-template-columns:1fr;gap:5px;padding:8px;}
-.cell-card{background:var(--bg3);border:1px solid var(--border);border-radius:7px;overflow:hidden;transition:border-color .15s;display:flex;flex-direction:row;align-items:stretch;}
-.cell-card:focus-within{border-color:var(--accent);}
-.cell-img-wrap{width:90px;min-width:90px;height:90px;background:var(--bg4);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden;flex-shrink:0;border-right:1px solid var(--border);}
-.cell-img-wrap img{width:100%;height:100%;object-fit:contain;padding:5px;}
-.cell-img-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--text3);font-size:8px;text-align:center;padding:6px;pointer-events:none;width:100%;height:100%;}
-.cell-img-ph .ico{font-size:20px;opacity:.3;}
-.cell-img-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-.cell-img-wrap:hover{background:rgba(60,245,180,.05);}
-.cell-body{padding:7px 9px;flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;}
-.cell-key{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent);}
-.cell-item{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cell-name{font-size:10px;font-weight:600;color:var(--text2);margin-top:2px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.cell-inputs{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:6px;}
-.cell-field{display:flex;flex-direction:column;gap:2px;}
-.cell-field label{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;}
-.lbl-weld{color:var(--weld-tx);}
-.lbl-pint{color:var(--pint-tx);}
-.cell-field input{width:100%;text-align:center;background:var(--bg4);border:1px solid var(--border2);border-radius:3px;color:var(--text);font-family:var(--mono);font-size:13px;font-weight:700;padding:4px 2px;transition:border-color .15s;}
-.cell-field input:focus{outline:none;}
-.cell-field.weld input:focus{border-color:var(--weld-tx);}
-.cell-field.pint input:focus{border-color:var(--pint-tx);}
-/* FILE + RUN */
-.bottom-area{padding:9px 11px;border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column;gap:7px;}
-.upload-zone{border:1.5px dashed var(--border2);border-radius:6px;padding:10px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3);position:relative;}
-.upload-zone:hover,.upload-zone.drag{border-color:var(--accent2);background:rgba(60,245,180,.04);}
-.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-.up-title{font-size:11px;font-weight:600;color:var(--text);}
-.up-sub{font-family:var(--mono);font-size:9px;color:var(--text2);margin-top:2px;}
-.up-info{font-family:var(--mono);font-size:10px;color:var(--accent2);background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:4px 9px;display:none;align-items:center;gap:5px;}
-.up-info.show{display:flex;}
-.col-pick-wrap{display:none;background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;max-height:80px;overflow-y:auto;}
-.col-pick-row label{display:flex;align-items:flex-start;gap:5px;font-family:var(--mono);font-size:9px;color:var(--text2);cursor:pointer;padding:2px 0;}
-.col-pick-row input{accent-color:var(--accent);margin-top:1px;flex-shrink:0;}
-.btn-run{width:100%;padding:10px;background:var(--accent);color:#0b0d12;border:none;border-radius:6px;font-family:var(--font);font-size:12px;font-weight:700;letter-spacing:.15em;cursor:pointer;text-transform:uppercase;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
-.btn-run:hover{background:#fff;transform:translateY(-1px);}
-.btn-run:active{transform:translateY(0);}
-.btn-run:disabled{background:var(--bg4);color:var(--text3);cursor:not-allowed;transform:none;}
-/* MAIN */
-main{display:flex;flex-direction:column;overflow:hidden;}
-/* TWO-PANEL VIEW */
-.view-toggle-bar{padding:7px 14px;border-bottom:1px solid var(--border);display:flex;gap:6px;background:var(--bg3);flex-shrink:0;}
-.vtab{flex:1;padding:6px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .15s;font-weight:600;letter-spacing:.05em;}
-.vtab.active-inv{border-color:var(--weld-bd);color:var(--weld-tx);background:var(--weld-bg);}
-.vtab.active-res{border-color:var(--accent);color:var(--accent);background:rgba(212,245,60,.08);}
-.panel-inv{display:flex;flex-direction:column;flex:1;overflow:hidden;}
-.panel-res{display:flex;flex-direction:column;flex:1;overflow:hidden;}
-.res-bar{padding:9px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2);flex-shrink:0;min-height:54px;}
-.stats{display:flex;gap:14px;}
-.stat{text-align:center;}
-.stat-n{font-family:var(--mono);font-size:20px;font-weight:500;line-height:1;}
-.stat-l{font-size:8px;letter-spacing:.15em;color:var(--text2);text-transform:uppercase;margin-top:2px;}
-.stat.ok .stat-n{color:var(--ok-tx);}.stat.ns .stat-n{color:var(--ns-tx);}.stat.na .stat-n{color:var(--text3);}.stat.tot .stat-n{color:var(--text2);}
-.res-actions{display:flex;gap:6px;}
-.btn-sm{padding:5px 11px;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer;transition:all .15s;}
-.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
-.btn-sm.cloud{border-color:var(--accent2);color:var(--accent2);}
-.btn-sm.cloud:hover{background:var(--ok-bg);}
-.filter-bar{padding:6px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px;background:var(--bg2);flex-shrink:0;}
-.fchip{font-family:var(--mono);font-size:10px;padding:3px 10px;border-radius:3px;border:1px solid var(--border2);color:var(--text2);cursor:pointer;transition:all .15s;background:transparent;}
-.fchip.active{border-color:var(--accent);color:var(--accent);background:rgba(212,245,60,.08);}
-.fchip.active.ok{border-color:var(--ok-tx);color:var(--ok-tx);background:var(--ok-bg);}
-.fchip.active.ns{border-color:var(--ns-tx);color:var(--ns-tx);background:var(--ns-bg);}
-.fchip.active.weld{border-color:var(--weld-tx);color:var(--weld-tx);background:var(--weld-bg);}
-.fchip.active.pint{border-color:var(--pint-tx);color:var(--pint-tx);background:var(--pint-bg);}
-.srch{margin-left:auto;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:10px;padding:3px 8px;width:140px;}
-.srch:focus{outline:none;border-color:var(--accent2);}
-.srch::placeholder{color:var(--text3);}
-.tbl-wrap{flex:1;overflow:auto;}
-table{width:max-content;min-width:100%;border-collapse:collapse;}
-thead th{position:sticky;top:0;background:var(--bg2);z-index:2;padding:6px 6px;white-space:nowrap;font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:.06em;color:var(--text2);text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border2);}
-thead th.grp{font-size:8px;letter-spacing:.18em;color:var(--text3);border-bottom:1px solid var(--border);}
-thead th.s0{position:sticky;left:0;z-index:3;min-width:40px;}
-thead th.s1{position:sticky;left:40px;z-index:3;min-width:185px;text-align:left;border-right:2px solid var(--border2);}
-tbody tr{border-bottom:1px solid var(--border);transition:background .08s;}
-tbody tr:hover{background:var(--bg3);}
-tbody tr.hidden-row{display:none;}
-tbody td{padding:5px 6px;white-space:nowrap;font-family:var(--mono);font-size:10px;border-right:1px solid var(--border);text-align:center;}
-tbody td.s0{position:sticky;left:0;background:var(--bg2);z-index:1;color:var(--text3);font-size:9px;}
-tbody td.s1{position:sticky;left:40px;background:var(--bg2);z-index:1;text-align:left;color:var(--text);font-size:11px;border-right:2px solid var(--border2);}
-tbody tr:hover td.s0,tbody tr:hover td.s1{background:var(--bg3);}
-.b{display:inline-block;padding:2px 5px;border-radius:3px;font-size:9px;font-weight:500;border:1px solid;}
-.b-ok{background:var(--ok-bg);color:var(--ok-tx);border-color:var(--ok-bd);}
-.b-ns{background:var(--ns-bg);color:var(--ns-tx);border-color:var(--ns-bd);}
-.b-na{background:var(--na-bg);color:var(--na-tx);border-color:var(--na-bd);font-size:8px;}
-/* HIST PANEL */
-.hist-panel{position:fixed;right:0;top:52px;bottom:0;width:300px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s;z-index:10;}
-.hist-panel.open{transform:translateX(0);}
-.hist-hd{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.hist-ttl{font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--text2);text-transform:uppercase;}
-.hist-close{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;line-height:1;}
-.hist-scroll{flex:1;overflow-y:auto;padding:8px;}
-.hentry{background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px;cursor:pointer;transition:border-color .15s;}
-.hentry:hover{border-color:var(--accent2);}
-.hentry.active{border-color:var(--accent);}
-.hentry-hd{padding:7px 9px;display:flex;align-items:center;justify-content:space-between;}
-.hdate{font-family:var(--mono);font-size:11px;color:var(--text);font-weight:500;}
-.hmeta{font-family:var(--mono);font-size:9px;margin-top:2px;}
-.hdel{background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 4px;transition:color .15s;}
-.hdel:hover{color:var(--red);}
-.hempty{text-align:center;color:var(--text3);font-size:11px;padding:20px;}
-/* MODAL */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:20;display:none;align-items:center;justify-content:center;}
-.modal-bg.show{display:flex;}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:10px;width:400px;max-width:94vw;}
-.modal-hd{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.modal-t{font-size:13px;font-weight:700;color:var(--text);}
-.modal-x{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;line-height:1;}
-.modal-body{padding:14px 16px;font-size:13px;color:var(--text2);line-height:1.6;}
-.modal-foot{padding:11px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
-.btn-m{padding:6px 16px;border-radius:5px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;}
-.btn-cancel{background:transparent;border:1px solid var(--border2);color:var(--text2);}
-.btn-ok{background:var(--red);border:1px solid var(--red);color:#fff;}
-#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--bg4);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 16px;border-radius:5px;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none;}
-::-webkit-scrollbar{width:4px;height:4px;}
-::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;display:flex;flex-direction:column}
+
+/* ── STICKY BANDS ── */
+.topbar{
+  flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:0 20px;height:var(--h-top);
+  border-bottom:1px solid var(--border);background:var(--surface);
+  z-index:50;
+}
+.stats-bar{
+  flex-shrink:0;display:flex;gap:20px;align-items:center;
+  padding:0 20px;height:var(--h-stats);
+  border-bottom:1px solid var(--border);background:var(--surface);
+  z-index:49;flex-wrap:wrap;
+}
+.legend{
+  flex-shrink:0;display:flex;align-items:center;gap:18px;
+  padding:0 20px;height:var(--h-legend);
+  border-bottom:1px solid var(--border);background:var(--surface);
+  font-size:11px;flex-wrap:wrap;z-index:48;
+}
+.line-tabs{
+  flex-shrink:0;display:flex;gap:4px;
+  padding:8px 20px 0;height:var(--h-tabs);
+  border-bottom:1px solid var(--border);background:var(--surface);
+  overflow-x:auto;z-index:47;
+}
+
+/* ── SCROLLABLE TABLE AREA ── */
+.scroll-area{
+  flex:1;overflow:auto;
+  padding:0 20px 24px;
+}
+
+/* ── SHARED CONTROLS ── */
+.logo{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--accent);letter-spacing:.04em;white-space:nowrap}
+.logo span{color:var(--text3)}
+.sep{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface2);color:var(--text);transition:all .15s;white-space:nowrap}
+.btn:hover{background:#2a2a2a}.btn:active{transform:scale(.97)}
+.btn-save{background:var(--accent);color:#0f0f0f;border-color:var(--accent);font-weight:600}
+.btn-save:hover{background:#d4ff55;border-color:#d4ff55}
+.btn-add{background:var(--accent-dim);color:var(--accent);border-color:rgba(200,245,66,.3)}
+.save-st{font-family:var(--mono);font-size:11px;color:var(--text3);min-width:110px;text-align:right}
+.save-st.saved{color:var(--green)}.save-st.warn{color:var(--yellow)}
+input[type=date]{background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:13px;padding:5px 10px;border-radius:6px;outline:none;cursor:pointer}
+input[type=date]:focus{border-color:var(--accent)}
+label.lbl{font-size:11px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+
+/* ── STATS ── */
+.si{display:flex;align-items:center;gap:8px}
+.sl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.sv{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--text)}
+.sv.g{color:var(--green)}.sv.y{color:var(--yellow)}
+
+/* ── LEGEND ── */
+.li{display:flex;align-items:center;gap:5px;font-family:var(--mono)}
+.ld{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.ld0{background:var(--surface2);border:1px solid var(--border2)}
+.ld1{background:var(--ybg);border:1px solid var(--yborder)}
+.ld2{background:var(--gbg);border:1px solid var(--gborder)}
+
+/* ── TABS ── */
+.ltab{padding:7px 14px;border-radius:6px 6px 0 0;font-size:12px;font-family:var(--mono);font-weight:500;cursor:pointer;background:transparent;border:1px solid transparent;border-bottom:none;color:var(--text2);transition:all .15s;white-space:nowrap}
+.ltab:hover{color:var(--text);background:var(--surface2)}
+.ltab.active{background:var(--bg);border-color:var(--border);color:var(--accent);border-bottom-color:var(--bg);margin-bottom:-1px;position:relative;z-index:1}
+
+/* ── TABLE ── */
+table.at{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;margin-top:8px}
+
+/* Sticky table header — top = 0 because it's inside a scrolling container */
+table.at thead th{
+  position:sticky;top:0;z-index:10;
+  padding:7px 9px;text-align:left;
+  font-size:10px;font-family:var(--mono);font-weight:500;
+  color:var(--text3);text-transform:uppercase;letter-spacing:.07em;
+  background:var(--surface);border-bottom:2px solid var(--border2);
+  white-space:nowrap;
+}
+table.at th.tc{width:76px;text-align:center}
+table.at th.tseq{width:40px;text-align:center}
+table.at th.tdiv{background:var(--surface2);border-left:2px solid var(--accent);width:4px;padding:0}
+table.at tr.dr td{border-bottom:1px solid var(--border);padding:0;vertical-align:middle;background:var(--bg)}
+table.at tr.dr:hover td{background:#131313}
+
+/* ── INPUT CELLS (paste-friendly) ── */
+/* Each editable cell is a contenteditable div for easy paste */
+.ce{
+  display:block;width:100%;min-height:36px;
+  background:transparent;border:none;
+  color:var(--text);font-family:var(--mono);font-size:12px;
+  padding:8px 9px;outline:none;
+  white-space:pre;overflow:hidden;
+  cursor:text;
+}
+.ce:focus{background:rgba(200,245,66,.06);color:var(--accent)}
+.ce[placeholder]:empty::before{content:attr(placeholder);color:var(--text3);pointer-events:none}
+
+.cseq{font-family:var(--mono);font-size:12px;color:var(--text3);padding:8px 9px;text-align:center;user-select:none}
+
+/* ── COMPONENT CELLS ── */
+.cc{text-align:center;height:36px;cursor:pointer;border-left:1px solid var(--border);transition:background .1s;user-select:none}
+.cc:hover{filter:brightness(1.3)}
+.cc.drag-over{outline:2px solid var(--accent);outline-offset:-2px;filter:brightness(1.5)}
+.cc.s0{background:transparent}
+.cc.s1{background:var(--ybg);border-left-color:var(--yborder)}
+.cc.s2{background:var(--gbg);border-left-color:var(--gborder)}
+.ci{font-size:13px;line-height:36px;color:var(--text2)}
+.cc.s1 .ci{color:var(--yellow)}.cc.s2 .ci{color:var(--green)}
+
+.rdel{width:30px;text-align:center;border-left:1px solid var(--border)}
+.rdel button{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:4px 6px;border-radius:4px;transition:all .12s}
+.rdel button:hover{color:var(--red);background:rgba(245,66,66,.1)}
+
+/* ── PASTE PANEL ── */
+.paste-panel{
+  background:var(--surface);border:1px dashed var(--border2);
+  border-radius:8px;padding:16px 20px;margin-top:12px;
+}
+.paste-panel h4{font-size:12px;font-weight:500;color:var(--accent);font-family:var(--mono);margin-bottom:8px;letter-spacing:.04em}
+.paste-panel p{font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.6;font-family:var(--mono)}
+.paste-cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.paste-col{display:flex;flex-direction:column;gap:4px}
+.paste-col label{font-size:10px;color:var(--text2);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+.paste-col textarea{
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-family:var(--mono);font-size:11px;
+  padding:6px 8px;border-radius:5px;outline:none;resize:vertical;
+  min-height:80px;line-height:1.6;
+}
+.paste-col textarea:focus{border-color:var(--accent)}
+.paste-btn{margin-top:10px}
+
+/* ── EMPTY ── */
+.empty{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty .big{font-size:32px;margin-bottom:10px}
+.empty p{font-family:var(--mono);font-size:13px;line-height:1.8}
+
+/* ── MODALS ── */
+.modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center}
+.modal-ov.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:24px;width:400px;max-width:92vw}
+.modal h3{font-size:15px;font-weight:500;margin-bottom:6px;color:var(--text)}
+.modal p{font-size:13px;color:var(--text2);margin-bottom:14px;line-height:1.6}
+.mi{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:7px 11px;border-radius:6px;outline:none;margin-bottom:8px}
+.mi:focus{border-color:var(--accent)}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 15px;border-radius:8px;font-family:var(--mono);font-size:12px;z-index:300;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-color:var(--green);color:var(--green)}
+.toast.err{border-color:var(--red);color:var(--red)}
+.sync-badge{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:4px;background:var(--surface2);color:var(--text3);border:1px solid var(--border);white-space:nowrap}
+.sync-badge.live{color:var(--green);border-color:rgba(66,245,111,.3)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--surface)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── COMP HEADER COLORS ── */
+.hc1{color:#a0c4ff!important}.hc2{color:#ffd6a5!important}.hc3{color:#caffbf!important}
+.hc4{color:#ffadad!important}.hc5{color:#c77dff!important}.hc6{color:#f9c74f!important}
+
+/* ── STATE 3: NO APLICA ── */
+.cc.s3{background:rgba(100,100,120,.18);border-left-color:rgba(100,100,140,.35)}
+.cc.s3 .ci{color:#555;font-size:11px}
+
+/* ── MARCA (purple date highlight) ── */
+.date-marca{background:rgba(160,80,220,.22)!important;color:#c084fc!important;font-weight:500}
+.date-marca .ce{color:#c084fc!important}
+
+/* ── MODEL COLOR CODING — applied at TR level, cascade to all TDs ── */
+/* BLACK */
+tr.mc-black td{background:#161616!important}
+tr.mc-black .ce{color:#e8e8e8!important}
+tr.mc-black .cseq,.mc-black .seq-num{color:#888!important}
+tr.mc-black .cc.s0{background:#1e1e1e!important}
+/* NAVY */
+tr.mc-navy td{background:#0e1f3d!important}
+tr.mc-navy .ce{color:#93b8e8!important}
+tr.mc-navy .cseq,.mc-navy .seq-num{color:#5a85c0!important}
+tr.mc-navy .cc.s0{background:#111f3a!important}
+/* WHITE */
+tr.mc-white td{background:#cacaca!important}
+tr.mc-white .ce{color:#111!important}
+tr.mc-white .cseq,.mc-white .seq-num{color:#444!important}
+tr.mc-white .cc.s0{background:#bebebe!important}
+tr.mc-white .ci{color:#555!important}
+tr.mc-white:hover td{background:#d4d4d4!important}
+/* GREEN */
+tr.mc-green td{background:#0d2e18!important}
+tr.mc-green .ce{color:#5fe07a!important}
+tr.mc-green .cseq,.mc-green .seq-num{color:#3a7a50!important}
+tr.mc-green .cc.s0{background:#0f2e1a!important}
+/* RED */
+tr.mc-red td{background:#2e0d0d!important}
+tr.mc-red .ce{color:#e87070!important}
+tr.mc-red .cseq,.mc-red .seq-num{color:#8a3a3a!important}
+tr.mc-red .cc.s0{background:#2e1010!important}
+/* divider accent column stays consistent */
+tr[class*="mc-"] td[style*="border-left:2px solid var(--accent)"]{background:var(--surface2)!important}
+
+/* ── SEQ CELL: marca button ── */
+.seq-wrap{display:flex;align-items:center;justify-content:center;gap:4px;padding:2px 4px}
+.seq-num{font-family:var(--mono);font-size:12px;color:var(--text3);min-width:20px;text-align:center}
+.btn-marca{background:none;border:none;cursor:pointer;padding:2px 4px;border-radius:3px;
+  font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:.04em;
+  transition:all .15s;line-height:1}
+.btn-marca:hover{background:rgba(160,80,220,.2);color:#c084fc}
+.btn-marca.active{background:rgba(160,80,220,.25);color:#c084fc}
 </style>
 </head>
 <body>
-<div id="toast"></div>
-<header>
-  <div class="logo">ASSY<em>·</em>INV <em>/ C3</em></div>
-  <div class="hright">
-    <div class="chip" id="syncChip"><span class="sync-dot" id="syncDot"></span><span id="syncTxt">conectando...</span></div>
-    <div class="chip btn" onclick="toggleHist()">📋 HISTORIAL</div>
-    <div class="chip" id="dateChip"></div>
-  </div>
-</header>
-<div class="app">
-<aside>
-  <div class="date-bar">
-    <input type="date" class="date-input" id="invDate">
-    <button class="btn-icon" id="btnSave" onclick="saveSnapshot()">💾 GUARDAR</button>
-    <button class="btn-icon danger" onclick="confirmClear()">✕</button>
-  </div>
-  <div class="inv-mode-bar">
-    <button class="mode-btn active-weld" id="modeWeld" onclick="setMode('weld')">⚙ WELDING</button>
-    <button class="mode-btn" id="modePint" onclick="setMode('pint')">🎨 PINTURA</button>
-    <button class="mode-btn" id="modeBoth" onclick="setMode('both')">≡ AMBOS</button>
-  </div>
-  <div class="bottom-area">
-    <div class="upload-zone" id="dropZone">
-      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])">
-      <div class="up-title">📂 Arrastra o selecciona archivo</div>
-      <div class="up-sub">.CSV · .XLSX · .XLS</div>
-    </div>
-    <div class="up-info" id="upInfo"><span>✓</span><span id="upInfoTxt"></span></div>
-    <div class="col-pick-wrap" id="colPickWrap"><div id="colPickList"></div></div>
-    <button class="btn-run" id="btnRun" onclick="procesarSecuencias()" disabled>▶ PROCESAR</button>
-  </div>
-</aside>
-<main id="mainArea">
-  <!-- VIEW TOGGLE -->
-  <div class="view-toggle-bar">
-    <button class="vtab active-inv" id="tabInv" onclick="switchTab('inv')">⚙ INVENTARIO</button>
-    <button class="vtab" id="tabRes" onclick="switchTab('res')">📊 RESULTADOS</button>
-  </div>
 
-  <!-- PANEL INVENTARIO -->
-  <div class="panel-inv" id="panelInv">
-    <div style="flex:1;overflow-y:auto;">
-      <div class="block-hd" style="border-bottom:1px solid var(--border)"><span class="pip pip-o"></span>CELDAS G · FRAMES</div>
-      <div class="cells-grid" id="gSection"></div>
-      <div class="block-hd" style="border-top:1px solid var(--border)"><span class="pip pip-b"></span>CELDAS P · SUB-ENSAMBLES</div>
-      <div class="cells-grid" id="pSection"></div>
-      <div class="block-hd" style="border-top:1px solid var(--border)"><span class="pip pip-g"></span>CELDAS Y · ROPS / SEAT / BUMPER</div>
-      <div class="cells-grid" id="ySection"></div>
-    </div>
-  </div>
+<div class="toast" id="toast"></div>
 
-  <!-- PANEL RESULTADOS -->
-  <div class="panel-res" id="panelRes" style="display:none;">
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text2);">
-      <div style="font-size:40px;opacity:.2;">⬡</div>
-      <div style="font-size:14px;font-weight:700;color:var(--text);">Sin resultados</div>
-      <div style="font-size:11px;text-align:center;max-width:220px;line-height:1.7;">Carga un archivo de secuencias y presiona <strong>PROCESAR</strong></div>
+<!-- Modal: Firebase -->
+<div class="modal-ov" id="m-firebase">
+  <div class="modal" style="width:480px">
+    <h3 style="color:var(--accent);font-family:var(--mono)">⚡ Conectar Firebase</h3>
+    <p>Sincronización en tiempo real entre múltiples computadoras. Plan Spark de Firebase es <strong style="color:var(--text)">completamente gratis</strong>. <a href="https://console.firebase.google.com" target="_blank" style="color:var(--accent)">Crear proyecto →</a></p>
+    <input class="mi" id="fb-apiKey" placeholder="apiKey">
+    <input class="mi" id="fb-authDomain" placeholder="authDomain  (ej: proyecto.firebaseapp.com)">
+    <input class="mi" id="fb-dbURL" placeholder="databaseURL  (ej: https://proyecto-default-rtdb.firebaseio.com)">
+    <input class="mi" id="fb-projId" placeholder="projectId">
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-family:var(--mono);font-size:11px;color:var(--text3);line-height:1.8">
+      <span style="color:var(--accent)">Reglas Firebase (test mode):</span><br>
+      {"rules":{".read":true,".write":true}}
+    </div>
+    <div class="mbtns">
+      <button class="btn" onclick="useLocal()">Solo modo local</button>
+      <button class="btn btn-save" onclick="saveFBConfig()">Conectar →</button>
     </div>
   </div>
-</main>
 </div>
-<div class="hist-panel" id="histPanel">
-  <div class="hist-hd">
-    <span class="hist-ttl">📋 Historial · Supabase</span>
-    <button class="hist-close" onclick="toggleHist()">×</button>
-  </div>
-  <div class="hist-scroll" id="histScroll"><div class="hempty">Cargando...</div></div>
-</div>
-<div class="modal-bg" id="modalBg">
+
+<!-- Modal: Add Line -->
+<div class="modal-ov" id="m-addline">
   <div class="modal">
-    <div class="modal-hd"><span class="modal-t" id="modalT">Confirmar</span><button class="modal-x" onclick="closeModal()">×</button></div>
-    <div class="modal-body" id="modalB"></div>
-    <div class="modal-foot">
-      <button class="btn-m btn-cancel" onclick="closeModal()">Cancelar</button>
-      <button class="btn-m btn-ok" id="modalOk">Confirmar</button>
+    <h3>Nueva línea de ensamble</h3>
+    <p>Asigna un nombre. Los componentes se editan con el botón ✎ Componentes.</p>
+    <input class="mi" id="m-linename" type="text" placeholder="Ej: Línea 2, Turbo Line..." maxlength="30">
+    <div class="mbtns">
+      <button class="btn" onclick="closeM('m-addline')">Cancelar</button>
+      <button class="btn btn-add" onclick="doAddLine()">Crear</button>
     </div>
   </div>
 </div>
+
+<!-- Modal: Edit Components -->
+<div class="modal-ov" id="m-editcomps">
+  <div class="modal" style="width:460px">
+    <h3>Componentes — <span id="m-linelabel" style="color:var(--accent)"></span></h3>
+    <p>Un componente por línea. El orden define las columnas de la tabla.</p>
+    <textarea class="mi" id="m-comps-ta" rows="12" style="resize:vertical;line-height:1.7"></textarea>
+    <div class="mbtns">
+      <button class="btn" onclick="closeM('m-editcomps')">Cancelar</button>
+      <button class="btn btn-add" onclick="saveComps()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOP BAR ══ -->
+<div class="topbar">
+  <div class="logo">ASSY<span>/</span>TRACK</div>
+  <label class="lbl">Fecha</label>
+  <input type="date" id="dpicker" onchange="loadDay(this.value)">
+  <div class="sep"></div>
+  <div class="sync-badge" id="sync-badge">◉ Conectando...</div>
+  <button class="btn" onclick="openM('m-firebase')" title="Ver configuración Firebase">⚡ Config DB</button>
+  <button class="btn btn-add" onclick="addRow()">+ Unidad</button>
+  <button class="btn btn-save" onclick="saveDay()">↑ Guardar</button>
+  <div class="save-st" id="save-st">Sin cambios</div>
+</div>
+
+<!-- ══ STATS BAR ══ -->
+<div class="stats-bar">
+  <div class="si"><span class="sl">Unidades</span><span class="sv" id="s-total">0</span></div>
+  <div class="si"><span class="sl">Terminadas</span><span class="sv g" id="s-done">0</span></div>
+  <div class="si"><span class="sl">En proceso</span><span class="sv y" id="s-wip">0</span></div>
+  <div class="si"><span class="sl">Pendientes</span><span class="sv" id="s-pend">0</span></div>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="btn" style="font-size:11px;padding:3px 10px" onclick="editComponents()">✎ Componentes</button>
+    <button class="btn" style="font-size:11px;padding:3px 10px" onclick="exportCSV()">↓ CSV</button>
+  </div>
+</div>
+
+<!-- ══ LEGEND ══ -->
+<div class="legend">
+  <span style="font-family:var(--mono);font-size:11px;color:var(--text2)">Componentes:</span>
+  <div class="li"><div class="ld ld0"></div><span style="color:var(--text3)">Sin registrar</span></div>
+  <div class="li"><div class="ld ld1"></div><span style="color:var(--yellow)">En proceso</span></div>
+  <div class="li"><div class="ld ld2"></div><span style="color:var(--green)">Terminado</span></div>
+  <div class="li"><div class="ld" style="background:rgba(100,100,120,.3);border:1px solid #555"></div><span style="color:#666">N/A</span></div>
+  <div class="li"><div class="ld" style="background:rgba(160,80,220,.3);border:1px solid #c084fc"></div><span style="color:#c084fc">Marca</span></div>
+  <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--text3)">3 clicks = N/A &middot; MARCA en Seq &middot; Ctrl+S = guardar</span>
+</div>
+
+<!-- ══ LINE TABS ══ -->
+<div class="line-tabs" id="line-tabs"></div>
+
+<!-- ══ SCROLL AREA ══ -->
+<div class="scroll-area">
+
+  <!-- PASTE PANEL -->
+  <div class="paste-panel" id="paste-panel">
+    <h4>⬇ Pegar columnas desde Excel / Sheets</h4>
+    <p>Copia una columna completa en Excel, pégala en el campo correspondiente y presiona "Importar columnas". Los datos existentes se reemplazarán.</p>
+    <div class="paste-cols">
+      <div class="paste-col">
+        <label>Assy Date</label>
+        <textarea id="pc-date" placeholder="Pega fechas aquí&#10;una por línea…"></textarea>
+      </div>
+      <div class="paste-col">
+        <label>Color/Modelo</label>
+        <textarea id="pc-model" placeholder="Pega modelos aquí…"></textarea>
+      </div>
+      <div class="paste-col">
+        <label>Ensamble (VIN)</label>
+        <textarea id="pc-vin" placeholder="Pega VINs aquí…"></textarea>
+      </div>
+      <div class="paste-col">
+        <label>Pintura</label>
+        <textarea id="pc-paint" placeholder="Pega fechas pintura…"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <button class="btn btn-add paste-btn" onclick="importCols()">↓ Importar columnas</button>
+      <button class="btn" style="font-size:11px" onclick="clearPaste()">Limpiar campos</button>
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono)">Se creará una fila por cada valor encontrado</span>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <table class="at" id="at">
+    <thead id="thead"></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="empty" id="empty" style="display:none">
+    <div class="big">⬡</div>
+    <p>Sin unidades para este día.<br>Usa el panel de arriba para pegar columnas, o presiona <strong style="color:var(--accent)">+ Unidad</strong>.</p>
+  </div>
+
+</div><!-- /scroll-area -->
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 <script>
-// ══════════════════════════════════════════════════
-// SUPABASE
-// ══════════════════════════════════════════════════
-const SUPA_URL='https://smmtsngvtkaxxpahohqx.supabase.co';
-const SUPA_KEY='sb_publishable_qlMBSMT7CInJLxhMi3CkGw_vzHQ6dwF';
-const {createClient}=supabase;
-const db=createClient(SUPA_URL,SUPA_KEY);
-
-// ══════════════════════════════════════════════════
-// INVENTORY CELL DEFINITIONS  (from updated xlsm)
-// Cell refs now G/P/Y (not H/Q/Z)
-// ══════════════════════════════════════════════════
-const G_CELLS=[
-  {k:'G6', item:'32160-0832 2W / 32160-2093', name:'(AT820) FRAME-COMP'},
-  {k:'G7', item:'32160-0833 2W / 32160-2094', name:'(AF820) FRAME-COMP'},
-  {k:'G8', item:'32160-0839 2W / 32160-2104', name:'(DFT00) FRAME-COMP'},
-  {k:'G9', item:'32160-0840 2W / 32160-2105', name:'(DFT00) FRAME-COMP'},
-  {k:'G10',item:'32160-0837 2W / 32160-2106', name:'(DTT00) FRAME-COMP'},
-  {k:'G11',item:'32160-0838 2W / 32160-2107', name:'(DTT00) FRAME-COMP'},
-  {k:'G15',item:'32181-0093', name:'(AT820,AF820) SEAT / FRAME-SUB-COMP'},
-  {k:'G16',item:'32181-0101', name:'(DTT00,DFT00) SEAT / FRAME-SUB-COMP'},
-  {k:'G17',item:'32181-0102 1A', name:'(AT820,AF820) SEAT / FRAME-SUB-COMP'},
-  {k:'G18',item:'32181-0114', name:'(DFT00) SEAT / FRAME-SUB-COMP'},
-  {k:'G19',item:'32181-0118', name:'(DFT00,DTT00) SEAT / FRAME-SUB-COMP'},
-  {k:'G20',item:'32181-0092', name:'DASH / FRAME-SUB-COMP'},
-  {k:'G23',item:'39051-0035..0052', name:'FRAME COMP SIDE LH'},
-  {k:'G24',item:'39051-0035..0052', name:'FRAME COMP SIDE RH'},
-  {k:'G25',item:'31064-0706 / 31064-0707', name:'PIPE-COMP LH (DFT/AF)'},
-  {k:'G26',item:'31064-0706 / 31064-0707', name:'PIPE-COMP RH (DFT/AF)'},
-  {k:'G27',item:'31064-0704 / 31064-0705', name:'PIPE-COMP LH (AT/DTT)'},
-  {k:'G28',item:'31064-0704 / 31064-0705', name:'PIPE-COMP RH (AT/DTT)'},
-  {k:'G31',item:'31064-0704 1A / 31064-0706 1A', name:'PIPE-COMP L'},
-  {k:'G32',item:'31064-0705 1A / 31064-0707 1A', name:'PIPE-COMP R'},
-  {k:'G33',item:'31064-0706 1A', name:'PIPE-COMP L (AF/DFT)'},
-  {k:'G34',item:'31064-0707 1A', name:'PIPE-COMP R (AF/DFT)'},
-  {k:'G38',item:'39043-0345 / 39043-0346 / 39043-0347', name:'CROSSMEMBER-COMP'},
-  {k:'G39',item:'39042-0033 388 / AT820A-B2M1', name:'CROSSMEMBER'},
-  {k:'G40',item:'39043-0345 / 39043-0347', name:'CROSSMEMBER AF (DFT/AF)'},
-];
-const P_CELLS=[
-  {k:'P6', item:'39007-0537..0543', name:'ARM-SUB LEFT (ALL)'},
-  {k:'P7', item:'39007-0537..0543', name:'ARM-SUB RIGHT (ALL)'},
-  {k:'P8', item:'39007-0537..0543', name:'ARM SUB ALL'},
-  {k:'P9', item:'39007-0537..0543', name:'ARM-SUB LEFT 2'},
-  {k:'P10',item:'39007-0537..0543', name:'ARM-SUB RIGHT 2'},
-  {k:'P11',item:'39007-0537..0543', name:'ARM-SUB LEFT 3'},
-  {k:'P12',item:'39007-0537..0543', name:'ARM-SUB RIGHT 3'},
-  {k:'P15',item:'53029-0338/0343/0348/0349', name:'CARRIER (ALL)'},
-  {k:'P16',item:'32181-0093..0114', name:'FRAME-SUB-COMP (DFT/DTT)'},
-  {k:'P17',item:'32181-0093..0102', name:'FRAME-SUB-COMP (AT/AF)'},
-  {k:'P23',item:'31064-0634/0638/0640 1A', name:'LATERAL AT LEFT (AT/DTT)'},
-  {k:'P24',item:'31064-0635/0639/0641 1A', name:'LATERAL AT RIGHT (AT/DTT)'},
-  {k:'P25',item:'31064-0634/0638/0640 1A', name:'LATERAL AT LEFT 2'},
-  {k:'P26',item:'31064-0635/0639/0641 1A', name:'LATERAL AT RIGHT 2'},
-  {k:'P27',item:'31064-0634/0640 1A', name:'LATERAL AT LEFT 3'},
-  {k:'P28',item:'31064-0635/0641 1A', name:'LATERAL AT RIGHT 3'},
-  {k:'P29',item:'31064-0661/0758 1A', name:'LATERAL AF LEFT (DFT/AF)'},
-  {k:'P30',item:'31064-0661/0758 1A', name:'LATERAL AF RIGHT (DFT/AF)'},
-  {k:'P38',item:'14037-0758 A388 / 14037-0845', name:'SCREEN'},
-  {k:'P39',item:'14037-0845', name:'SCREEN (AT/DTT)'},
-  {k:'P40',item:'39043-0335/0336/0351 388', name:'CROSSMEMBER-COMP'},
-  {k:'P41',item:'39042-0033/0034/0037 388', name:'CROSSMEMBER (ALL)'},
-  {k:'P42',item:'39043-0335/0336/0351 388', name:'CROSSMEMBER-COMP B4'},
-  {k:'P43',item:'31064-0663 1A', name:'PIPE-COMP (AF/DFT)'},
-  {k:'P44',item:'39042-0033/0034/0037 388', name:'CROSSMEMBER 2 (ALL)'},
-  {k:'P45',item:'39043-0335..0351', name:'CROSSMEMBER-COMP (sin B4)'},
-  {k:'P46',item:'39043-0335/0336/0351 388', name:'CROSSMEMBER-COMP B4 2'},
-];
-const Y_CELLS=[
-  {k:'Y6', item:'53007-0364 1A', name:'(DTT00,AT820) FRAME-SEAT'},
-  {k:'Y7', item:'55020-2489 A388', name:'BUMPER (ALL)'},
-  {k:'Y8', item:'55047-0448/0449/0450/0451 388', name:'ROPS-LH (AT/DTT)'},
-  {k:'Y9', item:'55047-0448/0449/0450/0451 388', name:'ROPS-RH (AT/DTT)'},
-  {k:'Y10',item:'55047-0448/0450 388', name:'ROPS-LH (AF/DFT)'},
-  {k:'Y11',item:'55047-0449/0451 388', name:'ROPS-RH (AF/DFT)'},
-];
-
-// ══════════════════════════════════════════════════
-// COLUMN DEFINITIONS — from Matriz sheet (G/P/Y cells)
-// ALL = todas las secuencias aplican
-// ══════════════════════════════════════════════════
-const ALL_SEQS='ALL';
-const COLS=[
-  // FRAMES
-  {id:'AS',name:'FRAME',      sub:'Frame-Comp',         grp:'FRAMES',   cells:['G6'], listas:['G6']},
-  {id:'AU',name:'FRAME-SUB',  sub:'Frame-Sub-Comp',     grp:'FRAMES',   cells:['G15'],listas:['G15']},
-  {id:'AV',name:'SIDE LH',    sub:'Frame-Comp Side LH', grp:'FRAMES',   cells:['G23'],listas:['G23']},
-  {id:'AW',name:'SIDE RH',    sub:'Frame-Comp Side RH', grp:'FRAMES',   cells:['G24'],listas:['G24']},
-  // PIPES
-  {id:'AX',name:'PIPE-L',     sub:'Pipe-Comp L',        grp:'PIPES',    cells:['G31'],listas:['G31']},
-  {id:'AY',name:'PIPE-R',     sub:'Pipe-Comp R',        grp:'PIPES',    cells:['G32'],listas:['G32']},
-  {id:'AZ',name:'CROSS',      sub:'Crossmember',        grp:'PIPES',    cells:['G38'],listas:['G38']},
-  {id:'BA',name:'CROSS-AF',   sub:'Crossmember AF',     grp:'PIPES',    cells:['G40'],listas:['G40']},
-  // ARM-SUB
-  {id:'BB',name:'ARM-L 1',    sub:'Arm-Sub Left',       grp:'ARM-SUB',  cells:['P6'], listas:[ALL_SEQS]},
-  {id:'BC',name:'ARM-L 2',    sub:'Arm-Sub Left',       grp:'ARM-SUB',  cells:['P9'], listas:[ALL_SEQS]},
-  {id:'BD',name:'ARM-L 3',    sub:'Arm-Sub Left',       grp:'ARM-SUB',  cells:['P11'],listas:[ALL_SEQS]},
-  {id:'BE',name:'ARM-R 1',    sub:'Arm-Sub Right',      grp:'ARM-SUB',  cells:['P7'], listas:[ALL_SEQS]},
-  {id:'BF',name:'ARM-R 2',    sub:'Arm-Sub Right',      grp:'ARM-SUB',  cells:['P10'],listas:[ALL_SEQS]},
-  {id:'BG',name:'ARM-R 3',    sub:'Arm-Sub Right',      grp:'ARM-SUB',  cells:['P12'],listas:[ALL_SEQS]},
-  {id:'BH',name:'ARM-ALL',    sub:'Arm Sub All',        grp:'ARM-SUB',  cells:['P8'], listas:[ALL_SEQS]},
-  // CARRIER
-  {id:'BI',name:'CARRIER',    sub:'Carrier',            grp:'CARRIER',  cells:['P15'],listas:['P15']},
-  // LATERALS
-  {id:'BJ',name:'LAT-AF-L',   sub:'Lateral AF Left',    grp:'LATERALS', cells:['P29'],listas:['P29']},
-  {id:'BK',name:'LAT-AF-R',   sub:'Lateral AF Right',   grp:'LATERALS', cells:['P30'],listas:['P30']},
-  {id:'BL',name:'LAT-AT-L 1', sub:'Lateral AT Left',    grp:'LATERALS', cells:['P23'],listas:['P23']},
-  {id:'BM',name:'LAT-AT-R 1', sub:'Lateral AT Right',   grp:'LATERALS', cells:['P24'],listas:['P24']},
-  {id:'BN',name:'LAT-AT-L 2', sub:'Lateral AT Left',    grp:'LATERALS', cells:['P25'],listas:['P25']},
-  {id:'BO',name:'LAT-AT-R 2', sub:'Lateral AT Right',   grp:'LATERALS', cells:['P26'],listas:['P26']},
-  {id:'BP',name:'LAT-AT-L 3', sub:'Lateral AT Left',    grp:'LATERALS', cells:['P27'],listas:['P27']},
-  {id:'BQ',name:'LAT-AT-R 3', sub:'Lateral AT Right',   grp:'LATERALS', cells:['P28'],listas:['P28']},
-  // SCREEN / CROSS-COMP
-  {id:'BR',name:'SCREEN',     sub:'Screen',             grp:'SCREEN',   cells:['P38'],listas:['P38']},
-  {id:'BS',name:'CROSS-CMP 1',sub:'Crossmember-Comp',   grp:'SCREEN',   cells:['P40'],listas:['P40']},
-  {id:'BT',name:'CROSS-CMP 2',sub:'Crossmember-Comp',   grp:'SCREEN',   cells:['P41'],listas:[ALL_SEQS]},
-  {id:'BU',name:'CROSS-CMP 3',sub:'Crossmember-Comp',   grp:'SCREEN',   cells:['P44'],listas:[ALL_SEQS]},
-  {id:'BV',name:'PIPE-CMP',   sub:'Pipe-Comp',          grp:'SCREEN',   cells:['P43'],listas:['P43']},
-  {id:'BW',name:'CROSS 1',    sub:'Crossmember',        grp:'SCREEN',   cells:['P42'],listas:['P42']},
-  {id:'BX',name:'CROSS 2',    sub:'Crossmember',        grp:'SCREEN',   cells:['P45'],listas:['P45']},
-  {id:'BY',name:'CROSS 3',    sub:'Crossmember',        grp:'SCREEN',   cells:['P46'],listas:['P46']},
-  // FRAME-SEAT / BUMPER / ROPS
-  {id:'BZ',name:'SEAT',       sub:'Frame-Seat',         grp:'ROPS',     cells:['Y6'], listas:['Y6']},
-  {id:'CA',name:'BUMPER',     sub:'Bumper',             grp:'ROPS',     cells:['Y7'], listas:[ALL_SEQS]},
-  {id:'CB',name:'ROPS-LH',    sub:'ROPS LH',            grp:'ROPS',     cells:['Y8'], listas:['Y8']},
-  {id:'CC',name:'ROPS-RH',    sub:'ROPS RH',            grp:'ROPS',     cells:['Y9'], listas:['Y9']},
-];
-
-// ══════════════════════════════════════════════════
-// SEQUENCE LISTS per inventory cell (from Matriz sheet)
-// ══════════════════════════════════════════════════
-const SEQ_LISTS={
-  G6: ["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1","DTT00B-B4M1 BK1"],
-  G15:["AT820B-A3M1 GN1","AT820B-A3M1 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","DTT00B-B4M1 BK1"],
-  G23:["AT820B-A3M1 GN1","AT820B-A3M1 RD1","DTT00B-B4M1 BK1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1"],
-  G24:["AT820B-A3M1 GN1","AT820B-A3M1 RD1","DTT00B-B4M1 BK1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1"],
-  G31:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  G32:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  G38:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  G40:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  P15:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P23:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P24:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P25:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P26:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P27:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P28:["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P29:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  P30:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  P38:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  P40:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1"],
-  P42:["DFT00A-B4M1 GN1","DTT00B-B4M1 BK1"],
-  P43:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  P45:["AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00C-B2M2 WT1"],
-  P46:["DFT00A-B4M1 GN1","DTT00B-B4M1 BK1"],
-  Y6: ["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1"],
-  Y8: ["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-  Y9: ["AT820A-B2M1 BK1","AT820A-B2M5 BK1","AT820B-A2M3 GN1","AT820B-A2M3 RD1","AT820B-A3M1 GN1","AT820B-A3M1 RD1","AT820B-B2M1 GN1","AT820B-B2M1 RD1","AT820B-B2M5 GN1","AT820B-B2M5 RD1","AT820G-A2M1 WT1","DTT00B-A2M3 BK1","DTT00B-B2M1 BK1","DTT00B-B4M1 BK1","DTT00C-B2M2 WT1","AF820E-B2M1 BK1","AF820E-B2M5 BK1","AF820F-A2M3 GN1","AF820F-A2M3 RD1","AF820F-B2M1 GN1","AF820F-B2M1 RD1","AF820F-B2M5 GN1","AF820F-B2M5 RD1","DFT00A-A2M3 BK1","DFT00A-A2M3 GN1","DFT00A-B2M1 BK1","DFT00A-B2M1 GN1","DFT00A-B3M1 BK1","DFT00A-B3M1 GN1","DFT00A-B4M1 GN1"],
-};
-// Normalize all lists
-Object.keys(SEQ_LISTS).forEach(k=>{SEQ_LISTS[k]=SEQ_LISTS[k].map(s=>s.trim().replace(/\s+/g,' ').toUpperCase());});
-
-// All known sequences
-const TODAS_CONOCIDAS=new Set(SEQ_LISTS['G6'].map(s=>s.toUpperCase()));
-
-// ══════════════════════════════════════════════════
-// STATE
-// ══════════════════════════════════════════════════
-let invMode='weld', hCellImages={}, loadedSequences=[], lastResults=[], activeFilter='all', colFilter='both';
-
-// ══════════════════════════════════════════════════
-// INIT
-// ══════════════════════════════════════════════════
-document.getElementById('dateChip').textContent=new Date().toLocaleDateString('es-MX');
-document.getElementById('invDate').value=new Date().toISOString().slice(0,10);
-buildCells(G_CELLS,'gSection');
-buildCells(P_CELLS,'pSection');
-buildCells(Y_CELLS,'ySection');
-setupDrop();
-initSupa();
-
-function getAllCells(){return[...G_CELLS,...P_CELLS,...Y_CELLS];}
-
-// ══════════════════════════════════════════════════
-// TAB SWITCHING
-// ══════════════════════════════════════════════════
-function switchTab(tab){
-  const inv=document.getElementById('panelInv');
-  const res=document.getElementById('panelRes');
-  const tI=document.getElementById('tabInv');
-  const tR=document.getElementById('tabRes');
-  if(tab==='inv'){
-    inv.style.display='flex';res.style.display='none';
-    tI.className='vtab active-inv';tR.className='vtab';
-  } else {
-    inv.style.display='none';res.style.display='flex';
-    tI.className='vtab';tR.className='vtab active-res';
-  }
-}
-async function initSupa(){
-  setSync('loading','conectando...');
-  try{
-    const{error}=await db.from('inventory_snapshots').select('date').limit(1);
-    if(error)throw error;
-    setSync('ok','supabase ok');
-    loadImages();loadHistory();
-  }catch(e){setSync('err','sin conexión');showToast('⚠ '+e.message);}
-}
-function setSync(s,t){document.getElementById('syncDot').className='sync-dot '+s;document.getElementById('syncTxt').textContent=t;}
-
-// ══════════════════════════════════════════════════
-// BUILD CELL CARDS — unified
-// ══════════════════════════════════════════════════
-function buildCells(cells,containerId){
-  const g=document.getElementById(containerId);
-  if(!g)return;
-  g.innerHTML='';
-  cells.forEach(c=>{
-    const img=hCellImages[c.k]||'';
-    const card=document.createElement('div');
-    card.className='cell-card';
-    card.id='card_'+c.k;
-    card.innerHTML=`
-      <div class="cell-img-wrap" id="cimg_${c.k}">
-        <input type="file" accept="image/*" onchange="handleCellImage(event,'${c.k}')">
-        ${img?`<img id="cellimg_${c.k}" src="${img}">`:`<div class="cell-img-ph"><div class="ico">📷</div><div style="font-family:var(--mono)">${c.k}</div></div>`}
-      </div>
-      <div class="cell-body">
-        <div class="cell-key">${c.k}</div>
-        <div class="cell-item" title="${c.item}">${c.item}</div>
-        <div class="cell-name" title="${c.name}">${c.name}</div>
-        <div class="cell-inputs">
-          <div class="cell-field weld"><label class="lbl-weld">⚙ WELD</label><input id="inv_${c.k}_weld" type="number" min="0" value="0"></div>
-          <div class="cell-field pint"><label class="lbl-pint">🎨 PINT</label><input id="inv_${c.k}_pint" type="number" min="0" value="0"></div>
-        </div>
-      </div>`;
-    g.appendChild(card);
-  });
-  applyMode();
-}
-
-// ══════════════════════════════════════════════════
-// MODE
-// ══════════════════════════════════════════════════
-function setMode(m){
-  invMode=m;
-  document.getElementById('modeWeld').className='mode-btn'+(m==='weld'?' active-weld':'');
-  document.getElementById('modePint').className='mode-btn'+(m==='pint'?' active-pint':'');
-  document.getElementById('modeBoth').className='mode-btn'+(m==='both'?' active-both':'');
-  applyMode();
-}
-function applyMode(){
-  document.querySelectorAll('[id$="_weld"]').forEach(el=>{el.style.display=invMode==='pint'?'none':'';});
-  document.querySelectorAll('[id$="_pint"]').forEach(el=>{el.style.display=invMode==='weld'?'none':'';});
-  document.querySelectorAll('.lbl-weld').forEach(el=>{el.style.display=invMode==='pint'?'none':'';});
-  document.querySelectorAll('.lbl-pint').forEach(el=>{el.style.display=invMode==='weld'?'none':'';});
-}
-
-// ══════════════════════════════════════════════════
-// IMAGE UPLOAD → SUPABASE STORAGE
-// ══════════════════════════════════════════════════
-async function handleCellImage(event,cellKey){
-  const file=event.target.files[0];if(!file)return;
-  showToast('⏫ Subiendo imagen...');setSync('loading','subiendo...');
-  try{
-    const ext=file.name.split('.').pop();
-    const path=`cells/${cellKey}.${ext}`;
-    const{error:upErr}=await db.storage.from('cell-images').upload(path,file,{upsert:true});
-    if(upErr)throw upErr;
-    const{data}=db.storage.from('cell-images').getPublicUrl(path);
-    const url=data.publicUrl+'?t='+Date.now();
-    await db.from('cell_images').upsert({cell_key:cellKey,image_url:url},{onConflict:'cell_key'});
-    hCellImages[cellKey]=url;
-    const wrap=document.getElementById('cimg_'+cellKey);
-    const inp=wrap.querySelector('input[type=file]');
-    wrap.innerHTML='';wrap.appendChild(inp);
-    const img=document.createElement('img');img.src=url;img.id='cellimg_'+cellKey;
-    wrap.appendChild(img);
-    setSync('ok','supabase ok');showToast('✓ Imagen guardada · '+cellKey);
-  }catch(e){setSync('err','error');showToast('⚠ '+e.message);}
-}
-async function loadImages(){
-  try{
-    const{data,error}=await db.from('cell_images').select('cell_key,image_url');
-    if(error)throw error;
-    (data||[]).forEach(r=>{hCellImages[r.cell_key]=r.image_url;});
-    buildCells(G_CELLS,'gSection');buildCells(P_CELLS,'pSection');buildCells(Y_CELLS,'ySection');
-  }catch(e){console.warn('imgs:',e.message);}
-}
-
-// ══════════════════════════════════════════════════
-// SNAPSHOTS
-// ══════════════════════════════════════════════════
-function readInv(){
-  const w={},p={};
-  getAllCells().forEach(c=>{
-    w[c.k]=parseInt(document.getElementById('inv_'+c.k+'_weld')?.value)||0;
-    p[c.k]=parseInt(document.getElementById('inv_'+c.k+'_pint')?.value)||0;
-  });
-  return{w,p};
-}
-async function saveSnapshot(){
-  const date=document.getElementById('invDate').value;
-  if(!date){showToast('⚠ Selecciona fecha');return;}
-  const btn=document.getElementById('btnSave');
-  btn.disabled=true;btn.textContent='💾 Guardando...';setSync('loading','guardando...');
-  try{
-    const{w,p}=readInv();
-    const{error}=await db.from('inventory_snapshots').upsert({date,weld:w,pint:p,updated_at:new Date().toISOString()},{onConflict:'date'});
-    if(error)throw error;
-    setSync('ok','supabase ok');showToast('✓ Guardado · '+date);loadHistory();
-  }catch(e){setSync('err','error');showToast('⚠ '+e.message);}
-  finally{btn.disabled=false;btn.textContent='💾 GUARDAR';}
-}
-async function loadSnapshot(date){
-  setSync('loading','cargando...');
-  try{
-    const{data,error}=await db.from('inventory_snapshots').select('weld,pint').eq('date',date).single();
-    if(error)throw error;
-    getAllCells().forEach(c=>{
-      const w=document.getElementById('inv_'+c.k+'_weld');
-      const p=document.getElementById('inv_'+c.k+'_pint');
-      if(w)w.value=data.weld?.[c.k]??0;
-      if(p)p.value=data.pint?.[c.k]??0;
-    });
-    document.getElementById('invDate').value=date;
-    setSync('ok','supabase ok');showToast('📅 Cargado: '+date);
-    document.querySelectorAll('.hentry').forEach(e=>e.classList.remove('active'));
-    document.querySelector(`.hentry[data-date="${date}"]`)?.classList.add('active');
-  }catch(e){setSync('err','error');showToast('⚠ '+e.message);}
-}
-async function deleteSnapshot(date){
-  try{
-    const{error}=await db.from('inventory_snapshots').delete().eq('date',date);
-    if(error)throw error;
-    showToast('🗑 Eliminado: '+date);loadHistory();
-  }catch(e){showToast('⚠ '+e.message);}
-}
-async function loadHistory(){
-  const sc=document.getElementById('histScroll');
-  try{
-    const{data,error}=await db.from('inventory_snapshots').select('date,weld,pint').order('date',{ascending:false}).limit(60);
-    if(error)throw error;
-    if(!data||!data.length){sc.innerHTML='<div class="hempty">Sin registros</div>';return;}
-    sc.innerHTML=data.map(r=>{
-      const wt=Object.values(r.weld||{}).reduce((s,v)=>s+v,0);
-      const pt=Object.values(r.pint||{}).reduce((s,v)=>s+v,0);
-      const fd=new Date(r.date+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-      return`<div class="hentry" data-date="${r.date}" onclick="loadSnapshot('${r.date}')">
-        <div class="hentry-hd">
-          <div><div class="hdate">${fd}</div>
-          <div class="hmeta"><span style="color:var(--weld-tx)">⚙ ${wt}</span> &nbsp;<span style="color:var(--pint-tx)">🎨 ${pt}</span></div></div>
-          <button class="hdel" onclick="event.stopPropagation();confirmDelSnap('${r.date}')">✕</button>
-        </div></div>`;
-    }).join('');
-  }catch(e){sc.innerHTML='<div class="hempty">Error</div>';}
-}
-function toggleHist(){const p=document.getElementById('histPanel');p.classList.toggle('open');if(p.classList.contains('open'))loadHistory();}
-
-// ══════════════════════════════════════════════════
-// FILE HANDLING
-// ══════════════════════════════════════════════════
-function setupDrop(){
-  const dz=document.getElementById('dropZone');
-  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
-  dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
-  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
-}
-function handleFile(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  const r=new FileReader();
-  if(ext==='csv'){r.onload=e=>parseCSV(e.target.result,file.name);r.readAsText(file,'UTF-8');}
-  else{r.onload=e=>parseXLSX(e.target.result,file.name);r.readAsArrayBuffer(file);}
-}
-function parseCSV(text,fname){
-  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-  const d=lines[0].includes(';')?';':',';
-  const rows=lines.map(l=>l.split(d).map(c=>c.replace(/^["']|["']$/g,'').trim()));
-  if(rows[0].length===1){loadedSequences=rows.map(r=>r[0]).filter(Boolean);showInfo(fname);return;}
-  showColPicker(rows,fname);
-}
-function parseXLSX(buf,fname){
-  const wb=XLSX.read(buf,{type:'arraybuffer'});
-  const ws=wb.Sheets[wb.SheetNames[0]];
-  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-  if(rows[0].length===1){loadedSequences=rows.map(r=>String(r[0]||'').trim()).filter(Boolean);showInfo(fname);return;}
-  showColPicker(rows,fname);
-}
-function showColPicker(rows,fname){
-  const wrap=document.getElementById('colPickWrap'),list=document.getElementById('colPickList');
-  wrap.style.display='block';list.innerHTML='';
-  rows[0].forEach((h,i)=>{
-    const s=rows.slice(1,4).map(r=>r[i]||'').filter(Boolean).join(', ');
-    const d=document.createElement('div');d.className='col-pick-row';
-    d.innerHTML=`<label><input type="radio" name="cp" value="${i}" ${i===1?'checked':''}><span><b style="color:var(--text)">${h||'Col '+(i+1)}</b> <span style="color:var(--text2)">· ${s.slice(0,38)}</span></span></label>`;
-    d.querySelector('input').addEventListener('change',()=>{loadedSequences=rows.slice(1).map(r=>String(r[i]||'').trim()).filter(Boolean);showInfo(fname);});
-    list.appendChild(d);
-  });
-  const def=rows[0].findIndex(h=>/sec/i.test(String(h)));
-  list.querySelectorAll('input')[def>=0?def:1]?.click();
-}
-function showInfo(fname){
-  document.getElementById('upInfoTxt').textContent=`${fname} · ${loadedSequences.length} seqs`;
-  document.getElementById('upInfo').classList.add('show');
-  document.getElementById('btnRun').disabled=loadedSequences.length===0;
-}
-
-// ══════════════════════════════════════════════════
-// ENGINE
-// ══════════════════════════════════════════════════
-const norm=s=>String(s).trim().replace(/\s+/g,' ').toUpperCase();
-
-function inList(seq,listKey){
-  if(listKey===ALL_SEQS)return true;
-  const lst=SEQ_LISTS[listKey];
-  if(!lst)return true;
-  return lst.includes(norm(seq));
-}
-function getInvW(k){return parseInt(document.getElementById('inv_'+k+'_weld')?.value)||0;}
-function getInvP(k){return parseInt(document.getElementById('inv_'+k+'_pint')?.value)||0;}
-
-function procesarSecuencias(){
-  if(!loadedSequences.length)return;
-  const seqs=loadedSequences.map(norm);
-  const invW={},invP={};
-  getAllCells().forEach(c=>{invW[c.k]=getInvW(c.k);invP[c.k]=getInvP(c.k);});
-  const results=seqs.map((seq,idx)=>{
-    const row={idx:idx+1,seq,raw:loadedSequences[idx],vals:{},src:{}};
-    COLS.forEach(col=>{const r=evalCol(col,seq,invW,invP);row.vals[col.id]=r.result;row.src[col.id]=r.src;});
-    return row;
-  });
-  lastResults=results;colFilter='both';renderResults(results);
-}
-
-function evalCol(col,seq,invW,invP){
-  const consume=cell=>{
-    if((invW[cell]||0)>=1){invW[cell]--;return{result:'OK',src:'weld'};}
-    if((invP[cell]||0)>=1){invP[cell]--;return{result:'OK',src:'pint'};}
-    return{result:'SIN STOCK',src:null};
+// ─── FIREBASE AUTO-INIT ───────────────────────────────────
+(function(){
+  const cfg = {
+    apiKey:            "AIzaSyB5K5l9ToVWz0HcacQZeZ7R2EOciRn08hg",
+    authDomain:        "assy-track.firebaseapp.com",
+    databaseURL:       "https://assy-track-default-rtdb.firebaseio.com",
+    projectId:         "assy-track",
+    storageBucket:     "assy-track.firebasestorage.app",
+    messagingSenderId: "486646186460",
+    appId:             "1:486646186460:web:5abb841c4e1f1e7b7c8f19"
   };
-  // Check list membership
-  const applies=col.listas[0]===ALL_SEQS||inList(seq,col.listas[0]);
-  if(!applies)return{result:'NO APLICA',src:null};
-  for(const cell of col.cells){
-    const r=consume(cell);
-    if(r.result==='OK')return r;
+  // Store so initFB() picks it up immediately on load
+  localStorage.setItem('assy_fb_cfg', JSON.stringify(cfg));
+})();
+</script>
+<script>
+// ─── LINE DEFINITIONS ────────────────────────────────────
+const DEFAULT_LINES = {
+  'Kit Line': {
+    inputCols:[
+      {key:'seq',   label:'Seq',           type:'ro'},
+      {key:'date',  label:'Assy Date',      type:'text'},
+      {key:'model', label:'Color/Modelo',   type:'text'},
+      {key:'vin',   label:'Ensamble (VIN)', type:'text'},
+      {key:'paint', label:'Pintura',        type:'text'},
+    ],
+    components:['Frame','KIT','Panel L','Panel R','Tailgate F','Tailgate B','Carrier Bed','Axle','Swing','A-arm','Bumper']
   }
-  return{result:'SIN STOCK',src:null};
-}
+};
 
-// ══════════════════════════════════════════════════
-// RENDER
-// ══════════════════════════════════════════════════
-function badge(v,s){
-  if(v==='OK'){
-    const st=s==='weld'?'border-color:var(--weld-bd);color:var(--weld-tx);background:var(--weld-bg)':s==='pint'?'border-color:var(--pint-bd);color:var(--pint-tx);background:var(--pint-bg)':'';
-    return`<span class="b b-ok" style="${st}">${s==='weld'?'OK⚙':s==='pint'?'OK🎨':'OK'}</span>`;
+// ─── MODEL COLOR MAP ─────────────────────────────────────
+const MODEL_COLORS = {
+  black: ['AF400P-A2M3  BK1','AF400P-C2M1  BK1','AF400R-A2M3  BU1','AF400R-A3M1  BU1',
+          'AF400R-C2M1  BU1','AF400T-A2M3  BK1','AF400T-C2M1  BK1','AF400J-C2M1  BK1',
+          'AF400Y-B2M2  WT1','AF402A-A2M1  WT1','AF622C-A2M1  WT1','AT620F-A2M1  WT1'],
+  navy:  ['AF400J-C2M1  BU1','AF400P-A2M3  BU1','AF400P-C2M1  BU1','AF400P-C4M1  BU1'],
+  white: ['AF400S-A2M3  CM1','AF400S-C2M1  CM1','AT620C-C2M1  CM1'],
+  green: ['AF620M-A2M3  GN1','AF620P-C2M1  GN1','AF620M-C2M1  GN1','AT620A-C2M1  GN1',
+          'AT620B-A2M3  GN1','AT620B-C2M1  GN1'],
+  red:   ['AF620M-A2M3  RD1','AF620M-C2M1  RD1','AF620P-C2M1  RD1','AT620B-A2M3  RD1',
+          'AT620B-C2M1  RD1']
+};
+
+function getModelColor(model){
+  if(!model) return '';
+  const m = model.trim();
+  for(const [cls, list] of Object.entries(MODEL_COLORS)){
+    if(list.some(v => v.trim()===m)) return 'mc-'+cls;
   }
-  if(v==='SIN STOCK')return`<span class="b b-ns">SIN STOCK</span>`;
-  if(v==='NO APLICA')return`<span class="b b-na">N/A</span>`;
-  return`<span class="b" style="color:var(--text3)">?</span>`;
+  return '';
 }
 
-function renderResults(rows){
-  const panel=document.getElementById('panelRes');
-  let nOK=0,nNS=0,nNA=0,nW=0,nP=0;
-  rows.forEach(r=>Object.entries(r.vals).forEach(([id,v])=>{
-    if(v==='OK'){nOK++;if(r.src[id]==='weld')nW++;else nP++;}
-    else if(v==='SIN STOCK')nNS++;else nNA++;
-  }));
-  const grps={};
-  COLS.forEach(c=>{if(!grps[c.grp])grps[c.grp]=[];grps[c.grp].push(c);});
-  let thG='',thC='';
-  Object.entries(grps).forEach(([g,cs])=>{
-    thG+=`<th class="grp" colspan="${cs.length}">${g}</th>`;
-    cs.forEach(c=>{thC+=`<th title="${c.sub} · ${c.cells.join('/')}">${c.id}<br><span style="font-size:8px;color:var(--text3)">${c.name}</span></th>`;});
-  });
-  let tb='';
-  rows.forEach(r=>{
-    const unk=!TODAS_CONOCIDAS.has(r.seq);
-    tb+=`<tr data-row="${r.idx}"><td class="s0">${r.idx}</td><td class="s1 ${unk?'':''}" title="${r.seq}">${r.raw}${unk?'<span style="color:var(--orange);margin-left:3px">⚠</span>':''}</td>`;
-    COLS.forEach(c=>{tb+=`<td>${badge(r.vals[c.id],r.src[c.id])}</td>`;});
-    tb+='</tr>';
-  });
-  panel.innerHTML=`
-    <div class="res-bar">
-      <div class="stats">
-        <div class="stat ok"><div class="stat-n">${nOK}</div><div class="stat-l">OK Total</div></div>
-        <div class="stat"><div class="stat-n" style="color:var(--weld-tx)">${nW}</div><div class="stat-l">OK Weld</div></div>
-        <div class="stat"><div class="stat-n" style="color:var(--pint-tx)">${nP}</div><div class="stat-l">OK Pint</div></div>
-        <div class="stat ns"><div class="stat-n">${nNS}</div><div class="stat-l">Sin Stock</div></div>
-        <div class="stat na"><div class="stat-n">${nNA}</div><div class="stat-l">N/A</div></div>
-        <div class="stat tot"><div class="stat-n">${rows.length}</div><div class="stat-l">Seqs</div></div>
-      </div>
-      <div class="res-actions">
-        <button class="btn-sm cloud" onclick="saveResultsCloud()">☁ GUARDAR</button>
-        <button class="btn-sm" onclick="exportCSV()">↓ CSV</button>
-        <button class="btn-sm" onclick="exportXLSX()">↓ XLSX</button>
-      </div>
-    </div>
-    <div class="filter-bar">
-      <span style="font-family:var(--mono);font-size:9px;color:var(--text2)">FILA:</span>
-      <button class="fchip active" id="fc-all" onclick="setFilter('all')">TODAS</button>
-      <button class="fchip ok" id="fc-ok" onclick="setFilter('ok')">CON OK</button>
-      <button class="fchip ns" id="fc-ns" onclick="setFilter('ns')">SIN STOCK</button>
-      <span style="font-family:var(--mono);font-size:9px;color:var(--text2);margin-left:6px">TIPO:</span>
-      <button class="fchip" id="fc-weld" onclick="setColFilter('weld')">⚙ WELD</button>
-      <button class="fchip" id="fc-pint" onclick="setColFilter('pint')">🎨 PINT</button>
-      <input class="srch" placeholder="Buscar..." oninput="filterSearch(this.value)">
-    </div>
-    <div class="tbl-wrap"><table id="resTable">
-      <thead><tr><th class="s0 grp" rowspan="2">#</th><th class="s1 grp" rowspan="2">SECUENCIA</th>${thG}</tr><tr>${thC}</tr></thead>
-      <tbody>${tb}</tbody>
-    </table></div>`;
-  activeFilter='all';colFilter='both';
-  switchTab('res');
-}
+let LINES = {};
+let S = { date:todayStr(), line:'Kit Line', days:{}, fbMode:false, db:null, unsaved:false };
 
-function setFilter(f){
-  activeFilter=f;
-  document.querySelectorAll('.fchip').forEach(el=>{if(['fc-all','fc-ok','fc-ns'].includes(el.id))el.classList.remove('active');});
-  document.getElementById('fc-'+f)?.classList.add('active');
-  applyFilters();
-}
-function setColFilter(f){
-  colFilter=colFilter===f?'both':f;
-  document.getElementById('fc-weld').classList.toggle('active',colFilter==='weld');
-  document.getElementById('fc-weld').classList.toggle('weld',colFilter==='weld');
-  document.getElementById('fc-pint').classList.toggle('active',colFilter==='pint');
-  document.getElementById('fc-pint').classList.toggle('pint',colFilter==='pint');
-  applyFilters();
-}
-function filterSearch(){applyFilters();}
-function applyFilters(){
-  const q=(document.querySelector('.srch')?.value||'').trim().toUpperCase();
-  document.querySelectorAll('#resTable tbody tr').forEach((tr,i)=>{
-    const row=lastResults[i];if(!row)return;
-    const vals=Object.values(row.vals),srcs=Object.values(row.src);
-    let fr=activeFilter==='all'?true:activeFilter==='ok'?vals.includes('OK'):vals.includes('SIN STOCK');
-    if(colFilter!=='both')fr=fr&&vals.some((v,j)=>v==='OK'&&srcs[j]===colFilter);
-    tr.classList.toggle('hidden-row',!(fr&&(!q||row.seq.includes(q))));
-  });
-}
+function todayStr(){ return new Date().toISOString().split('T')[0]; }
 
-// ══════════════════════════════════════════════════
-// SAVE RESULTS
-// ══════════════════════════════════════════════════
-async function saveResultsCloud(){
-  if(!lastResults.length)return;
-  const date=document.getElementById('invDate').value||new Date().toISOString().slice(0,10);
-  setSync('loading','guardando...');
+// ─── FIREBASE ────────────────────────────────────────────
+function initFB(cfg){
   try{
-    const{error}=await db.from('processing_results').upsert({date,sequences:lastResults.map(r=>r.raw),results:lastResults.map(r=>({vals:r.vals,src:r.src})),created_at:new Date().toISOString()},{onConflict:'date'});
-    if(error)throw error;
-    setSync('ok','supabase ok');showToast('☁ Resultados guardados · '+date);
-  }catch(e){setSync('err','error');showToast('⚠ '+e.message);}
+    if(firebase.apps.length) firebase.apps[0].delete();
+    const app = firebase.initializeApp(cfg);
+    S.db = firebase.database(app);
+    S.fbMode = true;
+    const b = document.getElementById('sync-badge');
+    b.textContent = '⚡ LIVE'; b.classList.add('live');
+    listenFB();
+    toast('Firebase conectado — tiempo real activo','ok');
+  }catch(e){ toast('Error FB: '+e.message,'err'); }
 }
 
-// ══════════════════════════════════════════════════
-// EXPORTS
-// ══════════════════════════════════════════════════
+function listenFB(){
+  if(!S.db) return;
+  S.db.ref('assy').on('value', snap=>{
+    const d = snap.val();
+    if(d){
+      if(d.__lines){ Object.assign(LINES, d.__lines); delete d.__lines; }
+      S.days = d;
+    } else { S.days = {}; }
+    renderAll();
+  });
+}
+
+function pushFB(){
+  if(!S.db) return;
+  const payload = Object.assign({}, S.days, {__lines: LINES});
+  S.db.ref('assy').set(payload)
+    .then(()=>setSt('saved'))
+    .catch(e=>toast('Error: '+e.message,'err'));
+}
+
+// ─── LOCAL STORAGE ────────────────────────────────────────
+function saveLS(){
+  localStorage.setItem('assy_v3_days', JSON.stringify(S.days));
+  localStorage.setItem('assy_v3_lines', JSON.stringify(LINES));
+}
+function loadLS(){
+  const d = localStorage.getItem('assy_v3_days');
+  const l = localStorage.getItem('assy_v3_lines');
+  if(d) try{ S.days = JSON.parse(d); }catch(e){}
+  if(l) try{ Object.assign(LINES, JSON.parse(l)); }catch(e){}
+}
+
+// ─── DATA ─────────────────────────────────────────────────
+function getRows(){
+  if(!S.days[S.date]) S.days[S.date]={};
+  if(!S.days[S.date][S.line]) S.days[S.date][S.line]=[];
+  return S.days[S.date][S.line];
+}
+
+function blankRow(seq){
+  const comps={};
+  (LINES[S.line].components||[]).forEach(c=>{ comps[c]=0; });
+  return { id:Date.now()+''+Math.floor(Math.random()*9999), seq, date:'', model:'', vin:'', paint:'', components:comps };
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderAll(){ renderTabs(); renderHead(); renderBody(); renderStats(); }
+
+function renderTabs(){
+  const el = document.getElementById('line-tabs');
+  el.innerHTML = Object.keys(LINES).map(n=>
+    `<button class="ltab ${n===S.line?'active':''}" onclick="switchLine('${esc(n)}')">${esc(n)}</button>`
+  ).join('') +
+  `<button class="ltab" style="color:var(--text3);font-size:16px;padding:3px 12px" onclick="openM('m-addline')" title="Nueva línea">＋</button>`;
+}
+
+const HC=['hc1','hc2','hc3','hc4','hc5','hc6'];
+function renderHead(){
+  const line = LINES[S.line];
+  const iH = line.inputCols.map(c=>{
+    let ex = '';
+    if(c.key==='model') ex='style="min-width:145px"';
+    else if(c.key==='vin') ex='style="min-width:155px"';
+    else if(c.key==='date'||c.key==='paint') ex='style="min-width:110px"';
+    return `<th class="${c.key==='seq'?'tseq':''}" ${ex}>${c.label}</th>`;
+  }).join('');
+  const cH = line.components.map((c,i)=>
+    `<th class="tc ${HC[i%HC.length]}">${c}</th>`
+  ).join('');
+  document.getElementById('thead').innerHTML =
+    `<tr>${iH}<th class="tdiv"></th>${cH}<th style="width:30px"></th></tr>`;
+}
+
+function renderBody(){
+  const rows = getRows();
+  const line = LINES[S.line];
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  if(!rows.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  const icons=['','◐','●','—'];
+  tbody.innerHTML = rows.map((row,idx)=>{
+    const iCells = line.inputCols.map(col=>{
+      if(col.type==='ro'){
+        // Seq cell with MARCA button
+        const isMarked = row.marca===true;
+        return `<td><div class="seq-wrap">
+          <span class="seq-num">${idx+1}</span>
+          <button class="btn-marca ${isMarked?'active':''}" onclick="toggleMarca('${row.id}')" title="Marcar/desmarcar">MARCA</button>
+        </div></td>`;
+      }
+      // Model cell — color now inherited from TR
+      if(col.key==='model'){
+        return `<td><div class="ce" contenteditable="true"
+          data-id="${row.id}" data-key="${col.key}"
+          placeholder="${col.label}">${esc(row[col.key]||'')}</div></td>`;
+      }
+      // Date cell gets marca highlight
+      if(col.key==='date'){
+        const isMarked = row.marca===true;
+        return `<td class="${isMarked?'date-marca':''}"><div class="ce" contenteditable="true"
+          data-id="${row.id}" data-key="${col.key}"
+          placeholder="${col.label}">${esc(row[col.key]||'')}</div></td>`;
+      }
+      return `<td><div class="ce" contenteditable="true"
+        data-id="${row.id}" data-key="${col.key}"
+        placeholder="${col.label}">${esc(row[col.key]||'')}</div></td>`;
+    }).join('');
+    const cCells = line.components.map(comp=>{
+      const st=(row.components&&row.components[comp]!==undefined)?row.components[comp]:0;
+      return `<td class="cc s${st}" data-comp="${esc(comp)}" onclick="cycleComp('${row.id}','${esc(comp)}')" title="${esc(comp)}: ${['Sin registrar','En proceso','Terminado','No aplica'][st]}">
+        <span class="ci">${icons[st]}</span></td>`;
+    }).join('');
+    const rowMc = getModelColor(row.model||'');
+    return `<tr class="dr ${rowMc}" data-id="${row.id}">
+      ${iCells}
+      <td style="width:4px;border-left:2px solid var(--accent);border-bottom:1px solid var(--border)"></td>
+      ${cCells}
+      <td class="rdel"><button onclick="delRow('${row.id}')" title="Eliminar">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  // Setup drag-select for component cells
+  setupDragSelect();
+
+  // Attach input listeners to contenteditable cells
+  tbody.querySelectorAll('.ce[contenteditable]').forEach(el=>{
+    el.addEventListener('blur', ()=>{
+      updCell(el.dataset.id, el.dataset.key, el.textContent.trim());
+    });
+    // Allow Tab to move between cells
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); el.blur(); }
+    });
+  });
+}
+
+function renderStats(){
+  const rows=getRows();
+  const comps=LINES[S.line].components||[];
+  let done=0,wip=0,pend=0;
+  rows.forEach(r=>{
+    // Only consider applicable components (state != 3)
+    const vals=comps.map(c=>(r.components&&r.components[c])||0).filter(v=>v!==3);
+    if(vals.length===0||vals.every(v=>v===2)) done++;
+    else if(vals.some(v=>v>0)) wip++;
+    else pend++;
+  });
+  document.getElementById('s-total').textContent=rows.length;
+  document.getElementById('s-done').textContent=done;
+  document.getElementById('s-wip').textContent=wip;
+  document.getElementById('s-pend').textContent=pend;
+}
+
+// ─── ACTIONS ──────────────────────────────────────────────
+// ─── DRAG-SELECT STATE ───────────────────────────────────
+const DRAG = { active:false, startState:null, startRow:null, startComp:null };
+
+function cycleComp(rowId,comp){
+  const row=getRows().find(r=>r.id===rowId);
+  if(!row) return;
+  if(!row.components) row.components={};
+  row.components[comp]=((row.components[comp]||0)+1)%4; // 0=none 1=wip 2=done 3=N/A
+  markUnsaved();
+  renderBody(); renderStats();
+  if(S.fbMode){ clearTimeout(window._at); window._at=setTimeout(pushFB,600); }
+}
+
+function setCompState(rowId,comp,state){
+  const row=getRows().find(r=>r.id===rowId);
+  if(!row) return;
+  if(!row.components) row.components={};
+  row.components[comp]=state;
+}
+
+function setupDragSelect(){
+  const tbody=document.getElementById('tbody');
+
+  tbody.addEventListener('mousedown', e=>{
+    const cell=e.target.closest('.cc');
+    if(!cell) return;
+    e.preventDefault();
+    const tr=cell.closest('tr');
+    const rowId=tr?.dataset.id;
+    const comp=cell.dataset.comp;
+    if(!rowId||!comp) return;
+    const row=getRows().find(r=>r.id===rowId);
+    if(!row) return;
+    const cur=(row.components&&row.components[comp])||0;
+    const nextState=(cur+1)%4;
+    DRAG.active=true;
+    DRAG.startState=nextState;
+    DRAG.startRow=rowId;
+    DRAG.startComp=comp;
+    setCompState(rowId,comp,nextState);
+    markUnsaved();
+    // Visual feedback immediately
+    cell.className=`cc s${nextState}`;
+    cell.querySelector('.ci').textContent=['','◐','●','—'][nextState];
+  });
+
+  tbody.addEventListener('mouseover', e=>{
+    if(!DRAG.active) return;
+    const cell=e.target.closest('.cc');
+    if(!cell) return;
+    const comp=cell.dataset.comp;
+    if(comp!==DRAG.startComp) return; // only same column
+    const tr=cell.closest('tr');
+    const rowId=tr?.dataset.id;
+    if(!rowId) return;
+    setCompState(rowId,comp,DRAG.startState);
+    markUnsaved();
+    cell.className=`cc s${DRAG.startState} drag-over`;
+    cell.querySelector('.ci').textContent=['','◐','●','—'][DRAG.startState];
+  });
+
+  document.addEventListener('mouseup', ()=>{
+    if(!DRAG.active) return;
+    DRAG.active=false;
+    renderBody(); renderStats();
+    if(S.fbMode){ clearTimeout(window._at); window._at=setTimeout(pushFB,600); }
+  });
+}
+
+function updCell(rowId,key,val){
+  const row=getRows().find(r=>r.id===rowId);
+  if(!row) return;
+  row[key]=val; markUnsaved();
+  // Refresh row color immediately on model column change
+  if(key==='model'){
+    const tr = document.querySelector(`tr[data-id="${rowId}"]`);
+    if(tr){
+      // Remove existing mc classes
+      [...tr.classList].filter(c=>c.startsWith('mc-')).forEach(c=>tr.classList.remove(c));
+      const mc=getModelColor(val);
+      if(mc) tr.classList.add(mc);
+    }
+  }
+  if(S.fbMode){ clearTimeout(window._at); window._at=setTimeout(pushFB,1000); }
+}
+
+function toggleMarca(rowId){
+  const rows = getRows();
+  const row = rows.find(r=>r.id===rowId);
+  if(!row) return;
+  row.marca = !row.marca;
+  // Apply marca to this row AND 100 rows below
+  const idx = rows.indexOf(row);
+  for(let i=idx; i<Math.min(idx+101, rows.length); i++){
+    rows[i].marca = row.marca;
+  }
+  markUnsaved();
+  renderBody();
+  if(S.fbMode){ clearTimeout(window._at); window._at=setTimeout(pushFB,600); }
+}
+
+function addRow(){
+  const rows=getRows();
+  rows.push(blankRow(rows.length+1));
+  markUnsaved(); renderBody(); renderStats();
+  // Focus last editable cell
+  setTimeout(()=>{
+    const cells=document.querySelectorAll('.ce[contenteditable]');
+    if(cells.length){ cells[cells.length-1].focus(); }
+  },60);
+}
+
+function delRow(rowId){
+  S.days[S.date][S.line]=getRows().filter(r=>r.id!==rowId);
+  markUnsaved(); renderBody(); renderStats();
+}
+
+function saveDay(){
+  if(S.fbMode) pushFB();
+  else { saveLS(); setSt('saved'); }
+  S.unsaved=false;
+  toast('Día guardado ✓','ok');
+}
+
+function loadDay(d){
+  S.date=d; renderBody(); renderStats(); setSt('saved');
+}
+
+function switchLine(name){
+  S.line=name; renderAll();
+}
+
+// ─── PASTE IMPORT ─────────────────────────────────────────
+function importCols(){
+  const dateRaw  = document.getElementById('pc-date').value.trim();
+  const modelRaw = document.getElementById('pc-model').value.trim();
+  const vinRaw   = document.getElementById('pc-vin').value.trim();
+  const paintRaw = document.getElementById('pc-paint').value.trim();
+
+  // Split by newline, filter empty
+  const splitCol = s => s ? s.split(/\r?\n/).map(v=>v.trim()) : [];
+  const dates  = splitCol(dateRaw);
+  const models = splitCol(modelRaw);
+  const vins   = splitCol(vinRaw);
+  const paints = splitCol(paintRaw);
+
+  // Find max length across non-empty columns
+  const cols = [dates,models,vins,paints].filter(a=>a.length>0);
+  if(!cols.length){ toast('Pega datos en al menos una columna','err'); return; }
+  const n = Math.max(...cols.map(a=>a.length));
+  if(n===0){ toast('No se encontraron datos','err'); return; }
+
+  const comps={};
+  (LINES[S.line].components||[]).forEach(c=>{ comps[c]=0; });
+
+  const rows = [];
+  for(let i=0;i<n;i++){
+    // Preserve existing comp states if row exists
+    const existing = getRows()[i];
+    rows.push({
+      id: existing ? existing.id : Date.now()+''+i+Math.floor(Math.random()*999),
+      seq: i+1,
+      date:  dates[i]  || (existing?existing.date:''),
+      model: models[i] || (existing?existing.model:''),
+      vin:   vins[i]   || (existing?existing.vin:''),
+      paint: paints[i] || (existing?existing.paint:''),
+      components: existing ? existing.components : Object.assign({},comps)
+    });
+  }
+
+  if(!S.days[S.date]) S.days[S.date]={};
+  S.days[S.date][S.line] = rows;
+  markUnsaved(); renderBody(); renderStats();
+  clearPaste();
+  toast(`${n} filas importadas ✓`,'ok');
+}
+
+function clearPaste(){
+  ['pc-date','pc-model','pc-vin','pc-paint'].forEach(id=>{
+    document.getElementById(id).value='';
+  });
+}
+
+// ─── COMPONENT EDIT ───────────────────────────────────────
+function editComponents(){
+  document.getElementById('m-linelabel').textContent=S.line;
+  document.getElementById('m-comps-ta').value=(LINES[S.line].components||[]).join('\n');
+  openM('m-editcomps');
+}
+
+function saveComps(){
+  const comps=document.getElementById('m-comps-ta').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!comps.length){ toast('Agrega al menos un componente','err'); return; }
+  LINES[S.line].components=comps;
+  for(const d in S.days){
+    const line=S.days[d][S.line];
+    if(!line) continue;
+    line.forEach(row=>{
+      const nc={};
+      comps.forEach(c=>{ nc[c]=(row.components&&row.components[c])||0; });
+      row.components=nc;
+    });
+  }
+  saveLS(); closeM('m-editcomps'); renderAll();
+  toast('Componentes actualizados','ok');
+}
+
+// ─── ADD LINE ─────────────────────────────────────────────
+function doAddLine(){
+  const name=document.getElementById('m-linename').value.trim();
+  if(!name){ toast('Escribe un nombre','err'); return; }
+  if(LINES[name]){ toast('Ya existe esa línea','err'); return; }
+  LINES[name]={
+    inputCols:[
+      {key:'seq',label:'Seq',type:'ro'},
+      {key:'date',label:'Assy Date',type:'text'},
+      {key:'model',label:'Color/Modelo',type:'text'},
+      {key:'vin',label:'Ensamble (VIN)',type:'text'},
+      {key:'paint',label:'Pintura',type:'text'},
+    ],
+    components:['Frame','KIT','Panel L','Panel R','Tailgate F','Tailgate B','Carrier Bed','Axle','Swing','A-arm','Bumper']
+  };
+  document.getElementById('m-linename').value='';
+  closeM('m-addline'); saveLS(); switchLine(name);
+  toast(`Línea "${name}" creada`,'ok');
+}
+
+// ─── EXPORT CSV ───────────────────────────────────────────
 function exportCSV(){
-  if(!lastResults.length)return;
-  const h=['#','SECUENCIA',...COLS.map(c=>`${c.id} ${c.name}`)].join(',');
-  const b=lastResults.map(r=>[r.idx,`"${r.raw}"`,...COLS.map(c=>r.vals[c.id])].join(','));
-  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([[h,...b].join('\n')],{type:'text/csv'})),download:'ASSY-INV-C3_resultado.csv'});
+  const rows=getRows(); const line=LINES[S.line];
+  if(!rows.length){ toast('Sin datos para exportar','err'); return; }
+  const hdr=[...line.inputCols.filter(c=>c.type!=='ro').map(c=>c.label),...line.components];
+  const body=rows.map(r=>{
+    const ic=line.inputCols.filter(c=>c.type!=='ro').map(c=>`"${(r[c.key]||'').replace(/"/g,'""')}"`);
+    const cc=line.components.map(c=>['','En proceso','Terminado'][(r.components&&r.components[c])||0]);
+    return [...ic,...cc].join(',');
+  });
+  const csv=[hdr.join(','),...body].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`assy_${S.line.replace(/\s/g,'_')}_${S.date}.csv`;
   a.click();
-}
-function exportXLSX(){
-  if(!lastResults.length)return;
-  const h=['#','SECUENCIA',...COLS.map(c=>`${c.id} ${c.name}`)];
-  const d=lastResults.map(r=>[r.idx,r.raw,...COLS.map(c=>r.vals[c.id])]);
-  const ws=XLSX.utils.aoa_to_sheet([h,...d]);
-  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Resultados');
-  XLSX.writeFile(wb,'ASSY-INV-C3_resultado.xlsx');
+  toast('CSV exportado ✓','ok');
 }
 
-// ══════════════════════════════════════════════════
-// MODAL / CONFIRM / TOAST
-// ══════════════════════════════════════════════════
-function showModal(t,b,fn){
-  document.getElementById('modalT').textContent=t;
-  document.getElementById('modalB').innerHTML=b;
-  document.getElementById('modalOk').onclick=()=>{fn();closeModal();};
-  document.getElementById('modalBg').classList.add('show');
+// ─── FIREBASE CONFIG ──────────────────────────────────────
+function saveFBConfig(){
+  const cfg={
+    apiKey:document.getElementById('fb-apiKey').value.trim(),
+    authDomain:document.getElementById('fb-authDomain').value.trim(),
+    databaseURL:document.getElementById('fb-dbURL').value.trim(),
+    projectId:document.getElementById('fb-projId').value.trim(),
+  };
+  if(!cfg.apiKey||!cfg.databaseURL){ toast('Completa apiKey y databaseURL','err'); return; }
+  localStorage.setItem('assy_fb_cfg',JSON.stringify(cfg));
+  closeM('m-firebase'); initFB(cfg);
 }
-function closeModal(){document.getElementById('modalBg').classList.remove('show');}
-function confirmClear(){showModal('Limpiar inventario','¿Limpiar todos los campos?',()=>{getAllCells().forEach(c=>{const w=document.getElementById('inv_'+c.k+'_weld');const p=document.getElementById('inv_'+c.k+'_pint');if(w)w.value=0;if(p)p.value=0;});});}
-function confirmDelSnap(d){showModal('Eliminar',`¿Eliminar registro del <strong>${d}</strong>?`,()=>deleteSnapshot(d));}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity='1';clearTimeout(t._to);t._to=setTimeout(()=>{t.style.opacity='0';},2800);}
+function useLocal(){ closeM('m-firebase'); toast('Modo local activo','ok'); }
+
+// ─── HELPERS ─────────────────────────────────────────────
+function markUnsaved(){ S.unsaved=true; setSt('warn'); }
+function setSt(s){
+  const el=document.getElementById('save-st');
+  if(s==='saved'){ el.textContent='✓ Guardado'; el.className='save-st saved'; }
+  else { el.textContent='● Sin guardar'; el.className='save-st warn'; }
+}
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast show '+(type==='ok'?'ok':type==='err'?'err':'');
+  clearTimeout(window._tt);
+  window._tt=setTimeout(()=>{ el.className='toast'; },3000);
+}
+function openM(id){ document.getElementById(id).classList.add('open'); }
+function closeM(id){ document.getElementById(id).classList.remove('open'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+document.querySelectorAll('.modal-ov').forEach(m=>{
+  m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); });
+});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){ e.preventDefault(); saveDay(); }
+});
+
+// ─── INIT ─────────────────────────────────────────────────
+function init(){
+  LINES = JSON.parse(JSON.stringify(DEFAULT_LINES));
+  loadLS();
+  const today=todayStr();
+  S.date=today;
+  S.line=Object.keys(LINES)[0];
+  document.getElementById('dpicker').value=today;
+  const savedCfg=localStorage.getItem('assy_fb_cfg');
+  if(savedCfg){ try{ initFB(JSON.parse(savedCfg)); }catch(e){ renderAll(); } }
+  else renderAll();
+  setSt('saved');
+}
+
+init();
 </script>
 </body>
 </html>
